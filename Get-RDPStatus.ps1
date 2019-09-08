@@ -7,61 +7,74 @@ param(
 $RDPServices =@("TermService","UmRdpService")
 
 $ParamHash = [ordered]@{
-              Ping = "Failed."
-              FQDN = "Failed."
-              RDPPort = "Failed."
-              RDPServices = "Failed."
-              RDPSettings = "Disabled."
-              RDPwithNLA = "Enabled."
+              Ping = "Failed"
+              FQDN = "Failed"
+              RDPPort = "Failed"
+              RDPServices = "Failed"
+              RDPSettings = "Disabled"
+              RDPwithNLA = "Enabled"
               }
 
-     Write-Host "Checking the status for $RemoteComputer.........." -ForegroundColor Yellow
+              
+     
     
      try {
 
-            if((Test-Connection -ComputerName $RemoteComputer -Count 1 -Quiet -ErrorAction SilentlyContinue -ErrorVariable ErrVar1) -and ([System.Net.Dns]::GetHostEntry($RemoteComputer))) {
-
-                        $ParamHash["Ping"] = "Ok."
-                        $ParamHash["FQDN"] = "Ok."
+            #Check FQDN
+            if($DNS=([System.Net.Dns]::GetHostEntry($RemoteComputer)).HostName) { $ParamHash["FQDN"] = "Ok" ; $RemoteComputer = $DNS }
             
+
+            if(Test-Connection -ComputerName $RemoteComputer -Count 1 -Quiet) {
+
+                        $ParamHash["Ping"] = "Ok"
+                        
                         #Check the Firewall            
                         if(New-Object Net.sockets.TcpClient($RemoteComputer,3389)){ 
-                        $ParamHash["RDPPort"] = "Ok." 
+                        $ParamHash["RDPPort"] = "Ok" 
                         }
                         else{ 
-                        $ParamHash["RDPPort"] = "Failed." 
+                        $ParamHash["RDPPort"] = "Failed" 
                         }
             
                         #Check the Services            
                         if($RDPServices|ForEach-Object{ Get-WmiObject Win32_Service -ComputerName $RemoteComputer -Filter "Name = '$($_)' and state = 'Stopped'"}){
-                        $ParamHash["RDPServices"] = "Failed."
+                        $ParamHash["RDPServices"] = "Failed"
                         }
                         else{
-                        $ParamHash["RDPServices"] = "Ok." 
+                        $ParamHash["RDPServices"] = "Ok" 
                         }
                        
                         #Check the RDP Settings(Enabled\Disabled)
                         if((Get-WmiObject -Class Win32_TerminalServiceSetting -Namespace root\CIMV2\TerminalServices -ComputerName $RemoteComputer -Authentication 6).AllowTSConnections -eq 1) {
-                        $ParamHash["RDPSettings"] = "Enabled."          
+                        $ParamHash["RDPSettings"] = "Enabled"          
                         }
                          
                         #Check the RDP NLA Settings	
                         if((Get-WmiObject -class Win32_TSGeneralSetting -Namespace root\cimv2\terminalservices -ComputerName $RemoteComputer -Filter "TerminalName='RDP-tcp'" -Authentication 6).UserAuthenticationRequired -eq 0 ){
-                        $ParamHash["RDPwithNLA"] = "Disabled."          
+                        $ParamHash["RDPwithNLA"] = "Disabled"
+                                 
                         }
                         
             }
             else{
-                      if(!($ErrVar1)){$ParamHash["Ping"] = "Ok."}
-                      $ParamHash["RDPSettings"] = "Failed.."
-                      $ParamHash["RDPwithNLA"] = "Failed."
+                      
+                      $ParamHash["RDPSettings"] = "Failed"
+                      $ParamHash["RDPwithNLA"] = "Failed"
 
                  }
                               
 
     }
-    catch{
-    Write-Host "$_Exception.Message" -ForegroundColor Red
+    catch {
+            
+            Write-Host "$RemoteComputer :: $_.Exception.Message" -ForegroundColor Red
+            $ParamHash["RDPSettings"] = "Failed"
+            $ParamHash["RDPwithNLA"] = "Failed"
     }
-
-    $ParamHash.Keys | ForEach-Object {  "{0}`t`t`t{1}" -f $_,$($ParamHash[$_]) }
+    
+    Write-Host ("`t`t`t`RDP Connectivity Check : $RemoteComputer").ToUpper()  -ForegroundColor Green
+    
+    #Format the Output
+    $length = 0
+    $ParamHash.Keys | ForEach-Object { if(($_).length -ge $length) {$length = ($_).length } }
+    $ParamHash.Keys | ForEach-Object { Write-Host "$(($_).PadRight($length,'.'))..................................................$($ParamHash[$_]) " -ForegroundColor Yellow }
