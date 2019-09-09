@@ -1,3 +1,12 @@
+<#
+.Synopsis
+   Perform the Remote Desktop Connectivity Checks.
+.DESCRIPTION
+   This script will do the remote desktop connectivity checks for a given remote computer and show their status.
+.EXAMPLE
+   .\Get-RDPStatus.ps1 -RemoteComputer win7
+#>
+
 [cmdletBinding()]
 param(
 [string]$RemoteComputer = $env:COMPUTERNAME
